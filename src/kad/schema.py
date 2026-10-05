@@ -66,3 +66,23 @@ def from_noaa(df: pd.DataFrame) -> pd.DataFrame:
 def vessels_from_positions(df: pd.DataFrame) -> pd.DataFrame:
     """One row per vessel, using the most recent non-null value of each static field."""
     return df.sort_values("ts")[STATIC_COLUMNS].groupby("mmsi", as_index=False).last()
+
+
+def vessel_category(vessel_type: pd.Series) -> pd.Series:
+    """Collapse AIS ship-type codes into readable categories."""
+    t = vessel_type.astype("Float64")
+    conditions = [
+        (t == 37, "Pleasure craft"),
+        (t == 36, "Sailing"),
+        (t == 30, "Fishing"),
+        (t.isin([31, 32, 52]), "Tug / towing"),
+        (t.between(60, 69), "Passenger"),
+        (t.between(70, 79), "Cargo"),
+        (t.between(80, 89), "Tanker"),
+        (t.isin([35, 51, 55]), "Military / SAR / law enf."),
+        (t.isin([50, 53, 54]), "Pilot / port"),
+    ]
+    out = pd.Series("Other / unknown", index=vessel_type.index)
+    for mask, label in reversed(conditions):
+        out = out.mask(mask.fillna(False), label)
+    return out
